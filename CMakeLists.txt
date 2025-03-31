@@ -767,6 +767,7 @@ set(SOURCES
         file/sequence_file_reader.cc
         file/sst_file_manager_impl.cc
         file/writable_file_writer.cc
+        leaper/collector.cc 
         logging/auto_roll_logger.cc
         logging/event_logger.cc
         logging/log_buffer.cc
@@ -1646,3 +1647,7 @@ option(WITH_BENCHMARK "build benchmark tests" OFF)
 if(WITH_BENCHMARK)
   add_subdirectory(${PROJECT_SOURCE_DIR}/microbench/)
 endif()
+
+add_executable(simple_example examples/simple_example.cc)
+target_link_libraries(simple_example PRIVATE rocksdb)
+
