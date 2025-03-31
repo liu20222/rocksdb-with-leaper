@@ -114,6 +114,7 @@
 #include "util/string_util.h"
 #include "util/udt_util.h"
 #include "utilities/trace/replayer_impl.h"
+#include "leaper/collector.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -2294,7 +2295,14 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
          get_impl_options.columns != nullptr);
 
   assert(get_impl_options.column_family);
-
+  
+  if (ROCKSDB_NAMESPACE::leaper_read_collector) {
+    ROCKSDB_NAMESPACE::leaper_read_collector->RecordKeyAccess(key);
+    std::cout << "[Leaper] RecordKeyAccess(read) called." << std::endl;
+  } else {
+    std::cout << "[Leaper] RecordKeyAccess(read) failed." << std::endl;
+  }
+  
   if (read_options.timestamp) {
     const Status s = FailIfTsMismatchCf(get_impl_options.column_family,
                                         *(read_options.timestamp));

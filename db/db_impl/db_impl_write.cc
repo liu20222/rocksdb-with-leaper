@@ -17,6 +17,7 @@
 #include "options/options_helper.h"
 #include "test_util/sync_point.h"
 #include "util/cast_util.h"
+#include "leaper/collector.h"
 
 namespace ROCKSDB_NAMESPACE {
 // Convenience methods
@@ -2682,6 +2683,12 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   // Pre-allocate size of write batch conservatively.
   // 8 bytes are taken by header, 4 bytes for count, 1 byte for type,
   // and we allocate 11 extra bytes for key length, as well as value length.
+  if (ROCKSDB_NAMESPACE::leaper_write_collector) {
+    ROCKSDB_NAMESPACE::leaper_write_collector->RecordKeyAccess(key);
+    std::cout << "[Leaper] RecordKeyAccess(write) called." << std::endl;
+  } else {
+    std::cout << "[Leaper] RecordKeyAccess(write) failed." << std::endl;
+  }       
   WriteBatch batch(key.size() + value.size() + 24, 0 /* max_bytes */,
                    opt.protection_bytes_per_key, 0 /* default_cf_ts_sz */);
   Status s = batch.Put(column_family, key, value);
@@ -2693,6 +2700,15 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
 
 Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                const Slice& key, const Slice& ts, const Slice& value) {
+  // if (ROCKSDB_NAMESPACE::leaper_write_collector) {
+  //   ROCKSDB_NAMESPACE::leaper_write_collector->RecordKeyAccess(key);
+  // } 
+  // if (ROCKSDB_NAMESPACE::leaper_write_collector) {
+  //   ROCKSDB_NAMESPACE::leaper_write_collector->RecordKeyAccess(key);
+  //   std::cout << "[Leaper] RecordKeyAccess(write) called." << std::endl;
+  // } else {
+  //   std::cout << "[Leaper] RecordKeyAccess(write) failed." << std::endl;
+  // }              
   ColumnFamilyHandle* default_cf = DefaultColumnFamily();
   assert(default_cf);
   const Comparator* const default_cf_ucmp = default_cf->GetComparator();

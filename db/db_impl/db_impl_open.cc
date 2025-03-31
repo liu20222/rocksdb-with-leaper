@@ -28,6 +28,8 @@
 #include "util/rate_limiter_impl.h"
 #include "util/string_util.h"
 #include "util/udt_util.h"
+#include "leaper/collector.h"
+#include <iostream>
 
 namespace ROCKSDB_NAMESPACE {
 Options SanitizeOptions(const std::string& dbname, const Options& src,
@@ -2385,6 +2387,26 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
 
   auto impl = std::make_unique<DBImpl>(db_options, dbname, seq_per_batch,
                                        batch_per_txn);
+  if (leaper_read_collector == nullptr) {
+    std::cout << "[Leaper] Create read collector." << std::endl;
+    leaper_read_collector = new LeaperCollector(10000, 2, "/home/pickle/Desktop/20250331/rocksdb-main/leaper/leaper_read.csv");
+    if (leaper_read_collector) {
+      std::cout << "[Leaper] Read collector successfully created." << std::endl;
+    } else {
+      std::cerr << "[Leaper] ERROR: Failed to create read collector!" << std::endl;
+    }
+  }
+
+  if (leaper_write_collector == nullptr) {
+    std::cout << "[Leaper] Create write collector." << std::endl;
+    leaper_write_collector = new LeaperCollector(10000, 2, "/home/pickle/Desktop/20250331/rocksdb-main/leaper/leaper_write.csv");
+    if (leaper_write_collector) {
+      std::cout << "[Leaper] Write collector successfully created." << std::endl;
+    } else {
+      std::cerr << "[Leaper] ERROR: Failed to create write collector!" << std::endl;
+    }
+  }
+                                    
   if (!impl->immutable_db_options_.info_log) {
     s = impl->init_logger_creation_s_;
     return s;
