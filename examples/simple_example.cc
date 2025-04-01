@@ -4,6 +4,8 @@
 //  (found in the LICENSE.Apache file in the root directory).
 
 #include <cstdio>
+#include <iostream>
+#include <random>
 #include <string>
 
 #include "rocksdb/db.h"
@@ -27,6 +29,7 @@ std::string kDBPath = "/tmp/rocksdb_simple_example";
 int main() {
   DB* db;
   Options options;
+  std::cout << "simple_example runs." << std::endl;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options.IncreaseParallelism();
   options.OptimizeLevelStyleCompaction();
@@ -38,31 +41,31 @@ int main() {
   assert(s.ok());
 
   // Put key-value
-  s = db->Put(WriteOptions(), "key1", "value");
+  s = db->Put(WriteOptions(), "1461201", "value");
   assert(s.ok());
   std::string value;
   // get value
-  s = db->Get(ReadOptions(), "key1", &value);
+  s = db->Get(ReadOptions(), "1461201", &value);
   assert(s.ok());
   assert(value == "value");
 
   // atomically apply a set of updates
   {
     WriteBatch batch;
-    batch.Delete("key1");
-    batch.Put("key2", value);
+    batch.Delete("1461201");
+    batch.Put("1461202", value);
     s = db->Write(WriteOptions(), &batch);
   }
 
-  s = db->Get(ReadOptions(), "key1", &value);
+  s = db->Get(ReadOptions(), "1461201", &value);
   assert(s.IsNotFound());
 
-  db->Get(ReadOptions(), "key2", &value);
+  db->Get(ReadOptions(), "1461202", &value);
   assert(value == "value");
 
   {
     PinnableSlice pinnable_val;
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
+    db->Get(ReadOptions(), db->DefaultColumnFamily(), "1461202", &pinnable_val);
     assert(pinnable_val == "value");
   }
 
@@ -71,23 +74,52 @@ int main() {
     // If it cannot pin the value, it copies the value to its internal buffer.
     // The intenral buffer could be set during construction.
     PinnableSlice pinnable_val(&string_val);
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
+    db->Get(ReadOptions(), db->DefaultColumnFamily(), "1461202", &pinnable_val);
     assert(pinnable_val == "value");
     // If the value is not pinned, the internal buffer must have the value.
     assert(pinnable_val.IsPinned() || string_val == "value");
   }
 
   PinnableSlice pinnable_val;
-  s = db->Get(ReadOptions(), db->DefaultColumnFamily(), "key1", &pinnable_val);
+  s = db->Get(ReadOptions(), db->DefaultColumnFamily(), "1461201",
+              &pinnable_val);
   assert(s.IsNotFound());
   // Reset PinnableSlice after each use and before each reuse
   pinnable_val.Reset();
-  db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
+  db->Get(ReadOptions(), db->DefaultColumnFamily(), "1461202", &pinnable_val);
   assert(pinnable_val == "value");
   pinnable_val.Reset();
   // The Slice pointed by pinnable_val is not valid after this point
 
-  delete db;
+  // ---------- 强化测试：成千上万次 Put / Get ----------
+  std::default_random_engine rng(
+      (unsigned)std::chrono::system_clock::now().time_since_epoch().count());
+  std::uniform_int_distribution<int> dist(0, 19999);  // key0~key19999
 
+  std::cout << "Starting mass Put..." << std::endl;
+
+  for (int i = 0; i < 100000; ++i) {
+    std::string key = "mass_key_" + std::to_string(i);
+    std::string val = "val_" + std::to_string(i);
+    s = db->Put(WriteOptions(), key, val);
+    assert(s.ok());
+  }
+
+  std::cout << "Starting mass Get..." << std::endl;
+
+  for (int i = 0; i < 100000; ++i) {
+    std::string key = "mass_key_" + std::to_string(dist(rng));
+    std::string val;
+    s = db->Get(ReadOptions(), key, &val);
+    if (!s.ok() && !s.IsNotFound()) {
+      std::cerr << "Get failed for key: " << key << std::endl;
+    }
+  }
+
+  // ---------- 等待 Leaper 后台线程写出 CSV ----------
+  std::this_thread::sleep_for(std::chrono::seconds(6));
+
+  delete db;
+  std::cout << "simple_example finishes." << std::endl;
   return 0;
 }
